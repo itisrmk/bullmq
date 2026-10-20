@@ -342,11 +342,14 @@ class Scripts:
         args.append("1" if fetch_next else "0")
         if fetch_next:
             worker_opts = opts.get("workerOpts", {})
-            args.append(msgpack.packb({
+            packed = {
                 "token": token,
                 "lockDuration": worker_opts.get("lockDuration", 0),
                 "limiter": worker_opts.get("limiter", None),
-            }, use_bin_type=True))
+            }
+            if worker_opts.get("name") is not None:
+                packed["name"] = worker_opts.get("name")
+            args.append(msgpack.packb(packed, use_bin_type=True))
 
         return (keys, args)
 
@@ -691,8 +694,15 @@ class Scripts:
 
         keys = self.getKeys(['wait', 'active', 'prioritized', 'events',
                             'stalled', 'limiter', 'delayed', 'paused', 'meta', 'pc', 'marker'])
-        packedOpts = msgpack.packb(
-            {"token": token, "lockDuration": lockDuration, "limiter": limiter}, use_bin_type=True)
+        # Worker name is written to the job hash as "pb" (processedBy).
+        packed = {
+            "token": token,
+            "lockDuration": lockDuration,
+            "limiter": limiter,
+        }
+        if opts.get("name") is not None:
+            packed["name"] = opts.get("name")
+        packedOpts = msgpack.packb(packed, use_bin_type=True)
         args = [self.keys[''], timestamp, packedOpts]
 
         result = await self.commands["moveToActive"](keys=keys, args=args)
@@ -752,7 +762,7 @@ class Scripts:
         keepJobs = getKeepJobs(shouldRemove)
 
         opts = job.queue.opts
-        packedOpts = msgpack.packb({
+        packed = {
             "token": token,
             "keepJobs": keepJobs,
             "limiter": opts.get("limiter"),
@@ -764,7 +774,11 @@ class Scripts:
             "cpof": job.opts.get("continueParentOnFailure", False),
             "idof": job.opts.get("ignoreDependencyOnFailure", False),
             "rdof": job.opts.get("removeDependencyOnFailure", False)
-        }, use_bin_type=True)
+        }
+        # Needed when fetchNext pulls another job in the same script.
+        if opts.get("name") is not None:
+            packed["name"] = opts.get("name")
+        packedOpts = msgpack.packb(packed, use_bin_type=True)
 
         args = [job.id, timestamp, propVal, transformed_value or "", target,
                 fetchNext and "1" or "", self.keys[''], packedOpts]

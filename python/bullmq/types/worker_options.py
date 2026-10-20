@@ -6,7 +6,8 @@ from bullmq.types.connection_options import ConnectionOptions
 class WorkerOptions(TypedDict, total=False):
     name: str
     """
-    Optional worker name used to set the Redis client name.
+    Optional worker name. Stored on every job this worker processes
+    (`processedBy`) and used as the Redis client name.
     """
     autorun: bool
     """

@@ -53,6 +53,7 @@ class Job:
         self.removeOnComplete = opts.get("removeOnComplete", True)
         self.removeOnFail = opts.get("removeOnFail", False)
         self.processedOn = 0
+        self.processedBy = None
         self.finishedOn = 0
         self.returnvalue = None
         self.deferredFailure = None
@@ -325,6 +326,9 @@ class Job:
 
         if rawData.get("processedOn"):
             job.processedOn = int(rawData.get("processedOn"))
+
+        # Redis stores the worker name as "pb"; the Postgres mapper uses processedBy.
+        job.processedBy = rawData.get("pb") or rawData.get("processedBy")
 
         if rawData.get("rjk"):
             job.repeatJobKey = rawData.get("rjk")

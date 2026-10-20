@@ -316,6 +316,31 @@ class TestWorker(unittest.IsolatedAsyncioTestCase):
                         await worker.close()
                     await queue.close()
 
+    async def test_worker_name_is_stored_as_processed_by(self):
+        test_queue_name = f"__worker_name__{uuid4().hex}"
+        queue = Queue(test_queue_name, {"prefix": prefix})
+        worker = None
+        try:
+            job = await queue.add("test-job", {"foo": "bar"}, {"removeOnComplete": False})
+            seen = {}
+
+            async def process(job: Job, token: str):
+                seen["processedBy"] = job.processedBy
+
+            worker = Worker(test_queue_name, process, {"prefix": prefix, "name": "foobar"})
+            processing = Future()
+            worker.on("completed", lambda job, result: processing.set_result(None))
+
+            await processing
+
+            self.assertEqual(seen["processedBy"], "foobar")
+            stored = await Job.fromId(queue, job.id)
+            self.assertEqual(stored.processedBy, "foobar")
+        finally:
+            if worker is not None:
+                await worker.close()
+            await queue.close()
+
     async def test_process_renews_lock(self):
         queue = Queue(queueName, {"prefix": prefix})
         data = {"foo": "bar"}
