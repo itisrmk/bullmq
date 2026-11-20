@@ -114,7 +114,7 @@ public sealed class PostgresBackend : IQueueBackend
 
     public string ToKey(string type) => $"{Name}:{type}";
 
-    public string ClientName(string? suffix = null) => $"{Schema}:{Name}{suffix ?? string.Empty}";
+    public string ClientName(string? suffix = null) => $"{Name}{suffix ?? string.Empty}";
 
     public IQueueBackend ForQueue(string queueName, string? prefix = null)
     {

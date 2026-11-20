@@ -138,6 +138,12 @@ public sealed class Worker : IAsyncDisposable
 
         await backend.WaitUntilReadyAsync().ConfigureAwait(false);
 
+        if (Opts.Postgres is not null)
+        {
+            await backend.SetNameAsync(backend.ClientName(
+                string.IsNullOrEmpty(Opts.Name) ? null : $":w:{Opts.Name}")).ConfigureAwait(false);
+        }
+
         var lockRenewTime = Opts.LockRenewTime ?? Opts.LockDuration / 2;
         _lockManager = new LockManager(
             backend,

@@ -27,6 +27,45 @@ public sealed class PostgresConnectionPoolTests
 
     private static string Marker() => $"bullmq_pool_test_{Guid.NewGuid():N}";
 
+    [Theory]
+    [InlineData(null, "emails")]
+    [InlineData("", "emails")]
+    [InlineData(":w:worker-1", "emails:w:worker-1")]
+    [InlineData(":qe", "emails:qe")]
+    public async Task ClientName_MatchesNodeRegardlessOfSchema(string? suffix, string expected)
+    {
+        foreach (var schema in new[] { "bullmq", "custom_schema" })
+        {
+            var options = Options();
+            options.Schema = schema;
+            await using var backend = PostgresBackend.Create("emails", options);
+
+            Assert.Equal(expected, backend.ClientName(suffix));
+        }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("dotnet-worker")]
+    public async Task WorkerReadiness_RegistersTheCrossRuntimeDiscoveryName(string? workerName)
+    {
+        var name = $"discovery-{Guid.NewGuid():N}";
+        var expected = string.IsNullOrEmpty(workerName) ? name : $"{name}:w:{workerName}";
+        await using var queue = PostgresBackend.Create(name, Options());
+        Assert.Equal(0, CountName(await queue.GetClientListAsync(), expected));
+
+        await using var worker = new Worker(name, (_, _) => Task.FromResult<object?>(null), new WorkerOptions
+        {
+            Postgres = Options(),
+            Autorun = false,
+            Name = workerName,
+        });
+        await worker.WaitUntilReadyAsync();
+
+        Assert.Equal(1, CountName(await queue.GetClientListAsync(), expected));
+    }
+
     private static async Task<int> CountSessionsAsync(NpgsqlConnection monitor, string marker, bool activeOnly)
     {
         await using var cmd = new NpgsqlCommand(
